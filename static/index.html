@@ -172,6 +172,25 @@ function startGPS() {
 }
 function setGPS(cls, text) { $("gpsDot").className = "dot " + cls; $("gpsText").textContent = text; }
 
+// One-shot request, used from the shutter tap: a user gesture makes browsers far more willing to prompt.
+function getPosition() {
+  return new Promise((resolve, reject) => {
+    if (!("geolocation" in navigator)) return reject({ code: 2 });
+    navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+  });
+}
+
+function locationHelp(e) {
+  if (e && e.code === 1) {
+    return "Location is turned off for this site, so your phone didn't ask. " +
+      "iPhone (Safari): Settings → Privacy & Security → Location Services → Safari Websites → While Using the App. " +
+      "iPhone (Chrome): Settings → Chrome → Location → While Using the App. " +
+      "Android (Chrome): tap the icon left of the address bar → Permissions → Location → Allow. " +
+      "Then reload this page, or type the address instead.";
+  }
+  return "Couldn't get a GPS fix. Step outside or near a window and try again, or type the address instead.";
+}
+
 // ---------- camera ----------
 async function startCamera() {
   try {
@@ -203,11 +222,19 @@ $("fileCap").onchange = (e) => {
   e.target.value = "";
 };
 
-function capture(url) {
+async function capture(url) {
   photoURL = url;
   if (!fix) {
     showResult();
-    return renderError("We don't have your location yet. Allow location access, or type the address instead.", true);
+    $("scanline").classList.remove("hidden");
+    $("sheet").innerHTML = `<div class="card"><h2>Finding your location…</h2><p class="sub">Allow location access if your phone asks.</p></div>`;
+    try {
+      fix = (await getPosition()).coords;
+      startGPS();  // a denied watch stops for good; restart it now that we have permission
+    } catch (e) {
+      $("scanline").classList.add("hidden");
+      return renderError(locationHelp(e), true);
+    }
   }
   lookup({ lat: fix.latitude.toFixed(6), lon: fix.longitude.toFixed(6) });
 }
@@ -333,8 +360,9 @@ function renderError(msg, offerAddress) {
   $("eAddr").onclick = () => $("addrDlg").showModal();
 }
 
-startGPS();
-startCamera();
+// Ask one permission at a time: some mobile browsers drop the location prompt
+// when it arrives while the camera prompt is still on screen.
+startCamera().finally(startGPS);
 </script>
 </body>
 </html>
