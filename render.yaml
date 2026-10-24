@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: parcel-lens
+    runtime: python
+    plan: free
+    buildCommand: echo "No build step; standard library only"
+    startCommand: python3 server.py
+    healthCheckPath: /
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: USER_AGENT
+        value: ParcelLens/0.1 (parcels.ericcapehart.com)
+      - key: RENTCAST_API_KEY
+        sync: false
+      - key: WFRMLS_TOKEN
+        sync: false

@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1512">
+<title>Parcel Lens</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,650&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f6f3ec; --card: #ffffff; --ink: #1b2420; --muted: #66706a; --line: #e4dfd4;
+    --accent: #2f6b4f; --sale: #1f7a4d; --pending: #b7791f; --off: #6b7280; --sold: #7c3aed; --unknown: #8a8f8c;
+    --shadow: 0 1px 2px rgba(0,0,0,.05), 0 8px 24px rgba(0,0,0,.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f1512; --card: #18201c; --ink: #eef1ee; --muted: #9aa49e; --line: #27302b;
+      --accent: #6fc39a; --shadow: none;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1512; --card: #18201c; --ink: #eef1ee; --muted: #9aa49e; --line: #27302b;
+    --accent: #6fc39a; --shadow: none;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--bg); color: var(--ink); font: 15px/1.45 Inter, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  h1, h2, .serif { font-family: Fraunces, Georgia, serif; font-weight: 650; letter-spacing: -.01em; }
+  button { font: inherit; cursor: pointer; }
+  .hidden { display: none !important; }
+
+  /* ---------- camera screen ---------- */
+  #camera { position: fixed; inset: 0; background: #000; display: flex; flex-direction: column; }
+  #camera video, #camera .placeholder { flex: 1; width: 100%; object-fit: cover; min-height: 0; }
+  #camera .placeholder { display: grid; place-items: center; color: #cfd6d1; text-align: center; padding: 24px; }
+  .topbar { position: absolute; top: 0; left: 0; right: 0; padding: calc(env(safe-area-inset-top) + 14px) 16px 14px;
+            display: flex; justify-content: space-between; align-items: center; color: #fff;
+            background: linear-gradient(rgba(0,0,0,.55), transparent); }
+  .brand { font-family: Fraunces, serif; font-size: 20px; font-weight: 650; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 999px;
+          background: rgba(0,0,0,.45); backdrop-filter: blur(8px); font-size: 12.5px; font-weight: 500; color: #fff; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; }
+  .dot.good { background: #34d399; } .dot.bad { background: #ef4444; }
+  .reticle { position: absolute; left: 12%; right: 12%; top: 26%; bottom: 30%; border-radius: 18px; pointer-events: none;
+             box-shadow: 0 0 0 9999px rgba(0,0,0,.18); border: 1.5px solid rgba(255,255,255,.55); }
+  .controls { position: absolute; left: 0; right: 0; bottom: 0; padding: 24px 16px calc(env(safe-area-inset-bottom) + 22px);
+              display: flex; flex-direction: column; align-items: center; gap: 14px;
+              background: linear-gradient(transparent, rgba(0,0,0,.65)); }
+  .shutter { width: 76px; height: 76px; border-radius: 50%; border: 4px solid #fff; background: rgba(255,255,255,.25); padding: 0; }
+  .shutter span { display: block; width: 58px; height: 58px; margin: auto; border-radius: 50%; background: #fff; transition: transform .1s; }
+  .shutter:active span { transform: scale(.9); }
+  .shutter:disabled { opacity: .45; }
+  .linkbtn { background: none; border: 0; color: #fff; text-decoration: underline; text-underline-offset: 3px; opacity: .9; font-size: 14px; }
+  .hint { color: #e5e7e6; font-size: 13px; text-align: center; max-width: 300px; }
+
+  /* ---------- result screen ---------- */
+  #result { min-height: 100%; padding-bottom: 40px; }
+  .hero { position: relative; height: 38vh; min-height: 220px; max-height: 360px; background: #222 center/cover no-repeat; }
+  .hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(transparent 40%, rgba(0,0,0,.55)); }
+  .hero .back { position: absolute; top: calc(env(safe-area-inset-top) + 12px); left: 12px; z-index: 2; border: 0;
+                background: rgba(0,0,0,.45); color: #fff; padding: 8px 14px; border-radius: 999px; backdrop-filter: blur(8px); }
+  .scanline { position: absolute; left: 0; right: 0; height: 3px; background: var(--accent); box-shadow: 0 0 18px var(--accent);
+              z-index: 1; animation: scan 1.6s ease-in-out infinite; }
+  @keyframes scan { 0% { top: 8%; } 50% { top: 88%; } 100% { top: 8%; } }
+  .sheet { position: relative; z-index: 3; margin: -28px auto 0; max-width: 640px; padding: 0 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); padding: 20px; margin-bottom: 14px; }
+  .badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 12.5px; font-weight: 600;
+           color: #fff; background: var(--unknown); }
+  .badge.sale { background: var(--sale); } .badge.pending { background: var(--pending); }
+  .badge.off { background: var(--off); } .badge.sold { background: var(--sold); }
+  .addr { margin: 12px 0 2px; font-size: 26px; line-height: 1.15; }
+  .sub { color: var(--muted); font-size: 14px; }
+  .price { margin-top: 16px; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .price .amount { font-family: Fraunces, serif; font-size: 34px; font-weight: 650; }
+  .price .label { color: var(--muted); font-size: 13px; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border-radius: 14px; overflow: hidden; margin-top: 18px; }
+  .stat { background: var(--card); padding: 12px 10px; text-align: center; }
+  .stat b { display: block; font-size: 18px; font-weight: 600; }
+  .stat small { color: var(--muted); font-size: 12px; }
+  .note { margin-top: 14px; padding: 10px 12px; border-radius: 10px; background: color-mix(in srgb, var(--pending) 12%, transparent);
+          color: var(--ink); font-size: 13px; }
+  dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 10px 16px; }
+  dt { color: var(--muted); font-size: 13.5px; } dd { margin: 0; text-align: right; font-weight: 500; overflow-wrap: anywhere; }
+  .card h2 { font-size: 17px; margin: 0 0 14px; }
+  .nearby { display: flex; flex-wrap: wrap; gap: 8px; }
+  .nearby button { border: 1px solid var(--line); background: transparent; color: var(--ink); border-radius: 999px; padding: 7px 12px; font-size: 13px; }
+  .nearby button:hover { border-color: var(--accent); }
+  .card.map { padding: 0; overflow: hidden; }
+  .card.map iframe { display: block; width: 100%; height: 280px; border: 0; }
+  .links { display: flex; flex-direction: column; }
+  .links a { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 2px;
+             color: var(--ink); text-decoration: none; border-top: 1px solid var(--line); }
+  .links a:first-child { border-top: 0; padding-top: 0; }
+  .links a b { display: block; font-weight: 600; } .links a small { color: var(--muted); font-size: 12.5px; }
+  .links a > span:last-child { color: var(--accent); font-size: 18px; }
+  .remarks { font-size: 14px; color: var(--ink); white-space: pre-line; }
+  .sources { color: var(--muted); font-size: 12.5px; text-align: center; padding: 4px 8px 0; }
+  .primary { display: block; width: 100%; border: 0; border-radius: 14px; padding: 15px; background: var(--accent); color: #fff; font-weight: 600; font-size: 15px; }
+  .skeleton { height: 14px; border-radius: 6px; background: var(--line); margin: 10px 0; animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .5; } }
+  .err { color: #b91c1c; }
+
+  /* ---------- address dialog ---------- */
+  dialog { border: 0; border-radius: 18px; padding: 20px; width: min(420px, calc(100vw - 32px)); background: var(--card); color: var(--ink); }
+  dialog::backdrop { background: rgba(0,0,0,.5); }
+  dialog input { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: inherit; margin: 10px 0 14px; }
+  .row { display: flex; gap: 10px; } .row button { flex: 1; }
+  .ghost { border: 1px solid var(--line); background: transparent; color: var(--ink); border-radius: 14px; padding: 13px; }
+</style>
+</head>
+<body>
+
+<section id="camera">
+  <video id="video" autoplay playsinline muted></video>
+  <div id="noCam" class="placeholder hidden">
+    <div>
+      <p class="serif" style="font-size:22px;margin:0 0 6px">Point at a property</p>
+      <p class="hint" id="noCamMsg">Camera preview isn't available here. You can still take a photo or use your location.</p>
+    </div>
+  </div>
+  <div class="reticle"></div>
+  <div class="topbar">
+    <span class="brand">Parcel Lens</span>
+    <span class="chip"><span class="dot" id="gpsDot"></span><span id="gpsText">Finding location…</span></span>
+  </div>
+  <div class="controls">
+    <p class="hint">Stand in front of the home and tap to look it up.</p>
+    <button class="shutter" id="shutter" aria-label="Capture and look up"><span></span></button>
+    <button class="linkbtn" id="typeAddr">Type an address instead</button>
+  </div>
+  <input type="file" accept="image/*" capture="environment" id="fileCap" class="hidden">
+</section>
+
+<section id="result" class="hidden">
+  <div class="hero" id="hero">
+    <button class="back" id="back">← Scan</button>
+    <div class="scanline" id="scanline"></div>
+  </div>
+  <div class="sheet" id="sheet"></div>
+</section>
+
+<dialog id="addrDlg">
+  <form method="dialog" id="addrForm">
+    <h2 class="serif" style="margin:0;font-size:20px">Look up an address</h2>
+    <input id="addrInput" placeholder="e.g. 822 E Logan Ave, Salt Lake City" autocomplete="street-address" required>
+    <div class="row">
+      <button type="button" class="ghost" id="addrCancel">Cancel</button>
+      <button class="primary" value="go">Look up</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let fix = null;          // latest GPS position
+let photoURL = null;     // captured frame
+let lastQuery = null;
+
+// ---------- GPS ----------
+function startGPS() {
+  if (!("geolocation" in navigator)) return setGPS("bad", "No GPS");
+  navigator.geolocation.watchPosition(
+    (p) => {
+      fix = p.coords;
+      const acc = Math.round(fix.accuracy);
+      setGPS(acc <= 25 ? "good" : "", `±${acc} m`);
+    },
+    (e) => setGPS("bad", e.code === 1 ? "Location blocked" : "No GPS fix"),
+    { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 }
+  );
+}
+function setGPS(cls, text) { $("gpsDot").className = "dot " + cls; $("gpsText").textContent = text; }
+
+// ---------- camera ----------
+async function startCamera() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
+    $("video").srcObject = stream;
+  } catch (e) {
+    $("video").classList.add("hidden");
+    $("noCam").classList.remove("hidden");
+    if (!window.isSecureContext) $("noCamMsg").textContent = "Camera and GPS need HTTPS (or localhost).";
+  }
+}
+function grabFrame() {
+  const v = $("video");
+  if (!v.videoWidth) return null;
+  const c = document.createElement("canvas");
+  c.width = v.videoWidth; c.height = v.videoHeight;
+  c.getContext("2d").drawImage(v, 0, 0);
+  return c.toDataURL("image/jpeg", 0.85);
+}
+
+$("shutter").onclick = () => {
+  const frame = grabFrame();
+  if (frame) return capture(frame);
+  $("fileCap").click();  // no live preview: fall back to the native camera
+};
+$("fileCap").onchange = (e) => {
+  const f = e.target.files[0];
+  if (f) capture(URL.createObjectURL(f));
+  e.target.value = "";
+};
+
+function capture(url) {
+  photoURL = url;
+  if (!fix) {
+    showResult();
+    return renderError("We don't have your location yet. Allow location access, or type the address instead.", true);
+  }
+  lookup({ lat: fix.latitude.toFixed(6), lon: fix.longitude.toFixed(6) });
+}
+
+// ---------- address entry ----------
+$("typeAddr").onclick = () => { $("addrDlg").showModal(); $("addrInput").focus(); };
+$("addrCancel").onclick = () => $("addrDlg").close();
+$("addrForm").onsubmit = (e) => {
+  e.preventDefault();
+  $("addrDlg").close();
+  photoURL = photoURL || grabFrame();
+  lookup({ address: $("addrInput").value.trim() });
+};
+
+// ---------- lookup ----------
+async function lookup(params) {
+  lastQuery = params;
+  showResult();
+  $("scanline").classList.remove("hidden");
+  $("sheet").innerHTML = `<div class="card"><div class="skeleton" style="width:30%"></div><div class="skeleton" style="width:80%;height:24px"></div>
+    <div class="skeleton" style="width:50%"></div><div class="skeleton" style="width:60%;height:30px;margin-top:20px"></div></div>`;
+  try {
+    const res = await fetch("/api/lookup?" + new URLSearchParams(params));
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Lookup failed");
+    render(data);
+  } catch (e) {
+    renderError(e.message);
+  } finally {
+    $("scanline").classList.add("hidden");
+  }
+}
+
+function showResult() {
+  $("camera").classList.add("hidden");
+  $("result").classList.remove("hidden");
+  $("hero").style.backgroundImage = photoURL ? `url("${photoURL}")` : "linear-gradient(135deg,#2f6b4f,#1b2420)";
+  window.scrollTo(0, 0);
+}
+$("back").onclick = () => {
+  $("result").classList.add("hidden");
+  $("camera").classList.remove("hidden");
+  photoURL = null;
+};
+
+// ---------- rendering ----------
+const money = (n) => n == null ? null : "$" + Math.round(n).toLocaleString();
+const num = (n) => n == null ? null : Number(n).toLocaleString();
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const date = (s) => s ? new Date(s).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : null;
+
+function statusClass(s) {
+  return { "For Sale": "sale", "Coming Soon": "sale", "Pending": "pending", "Off Market": "off", "Sold": "sold" }[s] || "";
+}
+
+const fullAddress = (d) => [d.street, d.city, "UT " + (d.zip || "")].filter(Boolean).join(", ").trim();
+
+function siteLinks(d) {
+  if (!d.street) return [];
+  const zillowSlug = fullAddress(d).replace(/[#,]/g, "").replace(/\s+/g, "-");
+  return [["Zillow", "Zestimate & photos", `https://www.zillow.com/homes/${encodeURIComponent(zillowSlug)}_rb/`]];
+}
+
+// Keyless Google Maps embed; pins the address, falling back to the GPS point.
+function mapEmbedURL(d) {
+  const q = d.street ? fullAddress(d) : d.location ? `${d.location.lat},${d.location.lon}` : null;
+  return q ? `https://maps.google.com/maps?q=${encodeURIComponent(q)}&t=k&z=19&output=embed` : null;
+}
+
+function render(d) {
+  let price, priceLabel;
+  if (d.status === "Sold" && d.sold_price) { price = money(d.sold_price); priceLabel = "Sold " + (date(d.sold_date) || ""); }
+  else if (d.list_price && /For Sale|Pending|Coming/.test(d.status)) { price = money(d.list_price); priceLabel = "List price"; }
+  else if (d.assessed_value) { price = money(d.assessed_value); priceLabel = "County market value" + (d.assessor_as_of ? ` · ${d.assessor_as_of.slice(0, 4)}` : ""); }
+
+  const stats = [
+    ["Beds", d.bedrooms], ["Baths", d.bathrooms], ["Sq ft", num(d.sqft)],
+    ["Built", d.year_built], ["Acres", d.acres], ["Floors", d.floors],
+  ].map(([k, v]) => `<div class="stat"><b>${v ?? "—"}</b><small>${k}</small></div>`).join("");
+
+  const details = [
+    ["MLS #", d.mls_number], ["Listed", date(d.listed_date)], ["Days on market", d.days_on_market],
+    ["Last sale", d.last_sale_price ? `${money(d.last_sale_price)} · ${date(d.last_sale_date)}` : null],
+    ["County market value", money(d.assessed_value)], ["Land value", money(d.land_value)],
+    ["Property type", d.property_class], ["Construction", d.construction], ["Subdivision", d.subdivision],
+    ["Parcel ID", d.parcel_id], ["County", d.county],
+  ].filter(([, v]) => v != null && v !== "");
+
+  const nearby = (d.nearby || []).filter((n) => n.address);
+  const links = siteLinks(d);
+  const mapURL = mapEmbedURL(d);
+  $("sheet").innerHTML = `
+    <div class="card">
+      <span class="badge ${statusClass(d.status)}">${esc(d.status)}</span>
+      <h1 class="addr">${esc(d.street || "Unknown address")}</h1>
+      <div class="sub">${esc([d.city, "UT", d.zip].filter(Boolean).join(", "))}</div>
+      ${price ? `<div class="price"><span class="amount">${price}</span><span class="label">${esc(priceLabel)}</span></div>` : ""}
+      <div class="stats">${stats}</div>
+      ${d.status_note ? `<div class="note">${esc(d.status_note)}</div>` : ""}
+      ${d.errors && d.errors.length ? `<div class="note">Some sources didn't respond: ${esc(d.errors.join("; "))}</div>` : ""}
+    </div>
+    ${d.remarks ? `<div class="card"><h2>About this listing</h2><div class="remarks">${esc(d.remarks)}</div></div>` : ""}
+    ${details.length ? `<div class="card"><h2>Details</h2><dl>${details.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl></div>` : ""}
+    ${mapURL ? `<div class="card map"><iframe src="${esc(mapURL)}" title="Map of ${esc(d.street || "property")}" loading="lazy"
+        referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe></div>` : ""}
+    ${links.length ? `<div class="card"><h2>More on this property</h2><div class="links">${links.map(([name, what, url]) =>
+        `<a href="${esc(url)}" target="_blank" rel="noopener"><span><b>${esc(name)}</b><small>${esc(what)}</small></span><span aria-hidden="true">↗</span></a>`).join("")}</div></div>` : ""}
+    ${nearby.length && d.location ?`<div class="card"><h2>Not this one?</h2><div class="nearby">${nearby.map((n) =>
+        `<button data-pid="${esc(n.parcel_id)}">${esc(n.address)}</button>`).join("")}</div></div>` : ""}
+    <button class="primary" id="again">Scan another property</button>
+    <p class="sources">Sources: ${esc((d.sources || []).join(" · ") || "none")}. County records may lag recent sales and remodels.</p>`;
+
+  $("again").onclick = () => $("back").click();
+  document.querySelectorAll("[data-pid]").forEach((b) => b.onclick = () =>
+    lookup({ lat: d.location.lat, lon: d.location.lon, parcel_id: b.dataset.pid }));
+}
+
+function renderError(msg, offerAddress) {
+  $("sheet").innerHTML = `<div class="card"><h2>Couldn't look that up</h2><p class="err">${esc(msg)}</p>
+    <div class="row"><button class="ghost" id="eBack">Back</button>
+    <button class="primary" id="eAddr">Type address</button></div></div>`;
+  $("eBack").onclick = () => $("back").click();
+  $("eAddr").onclick = () => $("addrDlg").showModal();
+}
+
+startGPS();
+startCamera();
+</script>
+</body>
+</html>
