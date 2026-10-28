@@ -48,19 +48,41 @@ def http_json(url, headers=None, timeout=12):
     return data
 
 
-# ---------- geocoding (OpenStreetMap Nominatim) ----------
+# ---------- geocoding (UGRC boundary layers + U.S. Census geocoder, no keys) ----------
+
+def _point_attrs(service, lat, lon, fields):
+    q = urllib.parse.urlencode({
+        "geometry": f"{lon},{lat}", "geometryType": "esriGeometryPoint", "inSR": 4326,
+        "spatialRel": "esriSpatialRelIntersects", "outFields": fields,
+        "returnGeometry": "false", "f": "json",
+    })
+    feats = http_json(f"{UGRC_BASE}/{service}/FeatureServer/0/query?{q}").get("features", [])
+    return feats[0]["attributes"] if feats else {}
+
 
 def reverse_geocode(lat, lon):
-    q = urllib.parse.urlencode({"lat": lat, "lon": lon, "format": "jsonv2", "addressdetails": 1})
-    return http_json("https://nominatim.openstreetmap.org/reverse?" + q).get("address", {})
+    """County, ZIP and city for a point; empty when the point is outside Utah."""
+    county = _point_attrs("UtahCountyBoundaries", lat, lon, "NAME")
+    if not county:
+        return {}
+    zip_area = _point_attrs("UtahZipCodeAreas", lat, lon, "ZIP5,NAME")
+    return {
+        "state": "Utah",
+        "county": county["NAME"].title() + " County",
+        "postcode": zip_area.get("ZIP5", ""),
+        "city": (zip_area.get("NAME") or "").title() or None,
+    }
 
 
 def forward_geocode(address):
-    q = urllib.parse.urlencode({"q": address, "format": "jsonv2", "addressdetails": 1,
-                                "countrycodes": "us", "limit": 5})
-    for r in http_json("https://nominatim.openstreetmap.org/search?" + q):
-        if r.get("address", {}).get("state") == "Utah":
-            return float(r["lat"]), float(r["lon"]), r["address"]
+    q = urllib.parse.urlencode({"address": address, "benchmark": "Public_AR_Current", "format": "json"})
+    matches = http_json("https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?" + q)
+    for m in matches.get("result", {}).get("addressMatches", []):
+        if m.get("addressComponents", {}).get("state") == "UT":
+            lat, lon = m["coordinates"]["y"], m["coordinates"]["x"]
+            geo = reverse_geocode(lat, lon)
+            if geo:
+                return lat, lon, geo
     return None
 
 
@@ -229,7 +251,7 @@ def build_property(parcel, geo_addr):
     full = ", ".join(x for x in (street, city, "UT " + zipcode if zipcode else "UT") if x)
 
     result = {"address": full, "street": street, "city": city, "zip": zipcode,
-              "county": (parcel or {}).get("COUNTY_NAME") or geo_addr.get("county"),
+              "county": geo_addr.get("county") or (parcel or {}).get("COUNTY_NAME"),
               "sources": [], "errors": []}
 
     listing = None
@@ -282,7 +304,7 @@ def lookup(params):
             return 400, {"error": "Pass lat & lon, or address."}
         geo_addr = reverse_geocode(lat, lon)
     if geo_addr.get("state") != "Utah":
-        return 422, {"error": "This version only covers Utah properties.", "state": geo_addr.get("state")}
+        return 422, {"error": "This version only covers Utah properties."}
 
     parcels = []
     if "address" in params:
