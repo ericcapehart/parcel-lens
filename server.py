@@ -320,6 +320,9 @@ def lookup(params):
 
 
 class Handler(SimpleHTTPRequestHandler):
+    extensions_map = {**SimpleHTTPRequestHandler.extensions_map,
+                      ".webmanifest": "application/manifest+json", ".js": "text/javascript"}
+
     def __init__(self, *a, **kw):
         super().__init__(*a, directory=STATIC_DIR, **kw)
 

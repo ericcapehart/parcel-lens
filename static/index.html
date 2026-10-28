@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0f1512">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Parcel Lens">
 <title>Parcel Lens</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,650&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -52,6 +59,14 @@
   .shutter:active span { transform: scale(.9); }
   .shutter:disabled { opacity: .45; }
   .linkbtn { background: none; border: 0; color: #fff; text-decoration: underline; text-underline-offset: 3px; opacity: .9; font-size: 14px; }
+  .install-tip { position: absolute; z-index: 2; top: calc(env(safe-area-inset-top) + 62px); left: 16px; right: 16px;
+                 display: flex; align-items: center; gap: 12px; padding: 12px 12px 12px 14px; border-radius: 14px;
+                 background: rgba(15,21,18,.82); backdrop-filter: blur(10px); color: #fff; font-size: 13.5px; line-height: 1.35; }
+  .install-tip img { width: 36px; height: 36px; border-radius: 9px; flex: none; }
+  .install-tip p { margin: 0; flex: 1; }
+  .install-tip b { font-weight: 600; }
+  .install-tip .go { border: 0; border-radius: 999px; padding: 7px 12px; background: #6fc39a; color: #0f1512; font-weight: 600; font-size: 13px; flex: none; }
+  .install-tip .x { border: 0; background: none; color: #cfd6d1; font-size: 20px; line-height: 1; padding: 4px; flex: none; }
   .hint { color: #e5e7e6; font-size: 13px; text-align: center; max-width: 300px; }
 
   /* ---------- result screen ---------- */
@@ -123,6 +138,12 @@
   <div class="topbar">
     <span class="brand">Parcel Lens</span>
     <span class="chip"><span class="dot" id="gpsDot"></span><span id="gpsText">Finding location…</span></span>
+  </div>
+  <div class="install-tip hidden" id="installTip">
+    <img src="/icons/icon-192.png" alt="">
+    <p id="installText"></p>
+    <button class="go hidden" id="installBtn">Install</button>
+    <button class="x" id="installClose" aria-label="Dismiss">×</button>
   </div>
   <div class="controls">
     <p class="hint">Stand in front of the home and tap to look it up.</p>
@@ -357,6 +378,47 @@ function renderError(msg, offerAddress) {
     <button class="primary" id="eAddr">Type address</button></div></div>`;
   $("eBack").onclick = () => $("back").click();
   $("eAddr").onclick = () => $("addrDlg").showModal();
+}
+
+// ---------- home-screen install ----------
+// Opened from the home screen, there's no address bar and outside links (like Zillow)
+// open in an in-app browser panel with a Done/close button that returns here.
+const isStandalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const isMobile = isIOS || /Android/.test(navigator.userAgent);
+let installPrompt = null;
+
+function tipDismissed() { try { return localStorage.getItem("installTipDismissed") === "1"; } catch { return false; } }
+function showInstallTip(html, withButton) {
+  if (isStandalone || !isMobile || tipDismissed()) return;
+  $("installText").innerHTML = html;
+  $("installBtn").classList.toggle("hidden", !withButton);
+  $("installTip").classList.remove("hidden");
+}
+$("installClose").onclick = () => {
+  $("installTip").classList.add("hidden");
+  try { localStorage.setItem("installTipDismissed", "1"); } catch {}
+};
+
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  installPrompt = e;
+  showInstallTip("<b>Install Parcel Lens</b> for full-screen camera and quicker access.", true);
+});
+$("installBtn").onclick = async () => {
+  if (!installPrompt) return;
+  installPrompt.prompt();
+  await installPrompt.userChoice;
+  installPrompt = null;
+  $("installTip").classList.add("hidden");
+};
+window.addEventListener("appinstalled", () => $("installTip").classList.add("hidden"));
+if (isIOS) {
+  showInstallTip("<b>Add to Home Screen</b> for full-screen camera: tap <b>Share</b>, then <b>Add to Home Screen</b>.", false);
+} else {
+  // Android browsers without an install prompt (e.g. Firefox) get manual steps
+  setTimeout(() => { if (!installPrompt) showInstallTip("<b>Add to Home Screen</b> for full-screen camera: tap <b>⋮</b>, then <b>Add to Home screen</b>.", false); }, 3000);
 }
 
 // Ask one permission at a time: some mobile browsers drop the location prompt
