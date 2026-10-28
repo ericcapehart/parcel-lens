@@ -333,7 +333,6 @@ function render(d) {
       <div class="sub">${esc([d.city, "UT", d.zip].filter(Boolean).join(", "))}</div>
       ${price ? `<div class="price"><span class="amount">${price}</span><span class="label">${esc(priceLabel)}</span></div>` : ""}
       <div class="stats">${stats}</div>
-      ${d.status_note ? `<div class="note">${esc(d.status_note)}</div>` : ""}
       ${d.errors && d.errors.length ? `<div class="note">Some sources didn't respond: ${esc(d.errors.join("; "))}</div>` : ""}
     </div>
     ${d.remarks ? `<div class="card"><h2>About this listing</h2><div class="remarks">${esc(d.remarks)}</div></div>` : ""}

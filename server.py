@@ -268,9 +268,7 @@ def build_property(parcel, geo_addr):
     if listing:
         result["sources"].append(listing.pop("source"))
         result.update({k: v for k, v in listing.items() if v is not None})
-    result.setdefault("status", "Off Market" if configured and not result["errors"] else "Unknown")
-    if not configured:
-        result["status_note"] = "No listing feed configured. Set WFRMLS_TOKEN or RENTCAST_API_KEY."
+    result.setdefault("status", "Off Market" if configured and not result["errors"] else "Status Unknown")
 
     if parcel:
         result["sources"].append(f"{parcel.get('COUNTY_NAME')} Assessor via UGRC")
