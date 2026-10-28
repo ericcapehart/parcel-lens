@@ -84,7 +84,8 @@
            color: #fff; background: var(--unknown); }
   .badge.sale { background: var(--sale); } .badge.pending { background: var(--pending); }
   .badge.off { background: var(--off); } .badge.sold { background: var(--sold); }
-  .addr { margin: 12px 0 2px; font-size: 26px; line-height: 1.15; }
+  .addr { margin: 0 0 2px; font-size: 26px; line-height: 1.15; }
+  .badge + .addr { margin-top: 12px; }
   .sub { color: var(--muted); font-size: 14px; }
   .price { margin-top: 16px; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
   .price .amount { font-family: Fraunces, serif; font-size: 34px; font-weight: 650; }
@@ -349,7 +350,7 @@ function render(d) {
   const mapURL = mapEmbedURL(d);
   $("sheet").innerHTML = `
     <div class="card">
-      <span class="badge ${statusClass(d.status)}">${esc(d.status)}</span>
+      ${d.status && d.status !== "Status Unknown" ? `<span class="badge ${statusClass(d.status)}">${esc(d.status)}</span>` : ""}
       <h1 class="addr">${esc(d.street || "Unknown address")}</h1>
       <div class="sub">${esc([d.city, "UT", d.zip].filter(Boolean).join(", "))}</div>
       ${price ? `<div class="price"><span class="amount">${price}</span><span class="label">${esc(priceLabel)}</span></div>` : ""}
